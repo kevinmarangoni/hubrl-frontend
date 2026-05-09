@@ -137,8 +137,8 @@ function mapToVisualLayers(input: {
   };
 }
 
-export default async function HubrlByIdPage({ params }: { params: { hubrlId: string } }) {
-  const { hubrlId } = params;
+export default async function HubrlByIdPage({ params }: { params: Promise<{ hubrlId: string }> }) {
+  const { hubrlId } = await params;
   const hubrl = await getHubrlById(hubrlId);
   if (!hubrl) {
     notFound();

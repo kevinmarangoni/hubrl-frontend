@@ -53,7 +53,8 @@ type HubrlItem = {
 
 const backendBaseUrl = process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
 
-export default async function EditHubrlPage({ params }: { params: { hubrlId: string } }) {
+export default async function EditHubrlPage({ params }: { params: Promise<{ hubrlId: string }> }) {
+  const { hubrlId } = await params;
   const session = await getServerSession(authOptions);
   if (!session?.backendAccessToken) {
     redirect("/login");
@@ -75,7 +76,7 @@ export default async function EditHubrlPage({ params }: { params: { hubrlId: str
   }
 
   const hubrls = (await response.json()) as HubrlItem[];
-  const hubrl = hubrls.find((item) => item.hubrlId === params.hubrlId || item.id === params.hubrlId);
+  const hubrl = hubrls.find((item) => item.hubrlId === hubrlId || item.id === hubrlId);
   if (!hubrl) {
     notFound();
   }
