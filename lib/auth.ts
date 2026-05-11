@@ -1,6 +1,7 @@
-import type { NextAuthOptions } from "next-auth";
+import type { Account, NextAuthOptions, Profile, User } from "next-auth";
+import DiscordProvider from "next-auth/providers/discord";
 import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
+import { backendUrl, http } from "@/lib/http";
 
 type BackendAuthResponse = {
   accessToken: string;
@@ -8,7 +9,7 @@ type BackendAuthResponse = {
     id: string;
     name: string;
     email: string;
-    provider: "local" | "google";
+    provider: "local" | "google" | "discord";
     lastLogin: string | null;
     isFirstLogin: boolean;
     avatarUrl: string | null;
@@ -16,8 +17,58 @@ type BackendAuthResponse = {
   };
 };
 
-const backendBaseUrl =
-  process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
+function applyBackendUser(adapterUser: User, data: BackendAuthResponse) {
+  adapterUser.id = data.user.id;
+  adapterUser.email = data.user.email;
+  adapterUser.name = data.user.name;
+  adapterUser.provider = data.user.provider;
+  adapterUser.lastLogin = data.user.lastLogin;
+  adapterUser.isFirstLogin = data.user.isFirstLogin;
+  adapterUser.avatarUrl = data.user.avatarUrl;
+  adapterUser.avatarPublicId = data.user.avatarPublicId;
+  adapterUser.backendAccessToken = data.accessToken;
+}
+
+async function syncOAuthWithBackend(params: {
+  adapterUser: User;
+  account: Account;
+  profile: Profile | undefined;
+  provider: "google" | "discord";
+}): Promise<boolean> {
+  const { adapterUser, account, profile, provider } = params;
+  const emailRaw = adapterUser.email ?? (profile as { email?: string } | undefined)?.email;
+  const email = typeof emailRaw === "string" ? emailRaw.trim() : "";
+  const discordProfile = profile as { global_name?: string | null; username?: string } | undefined;
+  const nameRaw =
+    adapterUser.name ??
+    profile?.name ??
+    discordProfile?.global_name ??
+    discordProfile?.username ??
+    (provider === "discord" ? "Discord" : "");
+  const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+  const subject = account.providerAccountId?.trim() ?? "oauth";
+  const token = `${provider}_${subject}`;
+
+  if (!email || !name) {
+    return false;
+  }
+
+  const path = provider === "google" ? "login/google" : "login/discord";
+  const body =
+    provider === "google"
+      ? { googleToken: token, email, name }
+      : { discordToken: token, email, name };
+
+  const response = await http.post(backendUrl(`users/${path}`), { json: body });
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const data = (await response.json()) as BackendAuthResponse;
+  applyBackendUser(adapterUser, data);
+  return true;
+}
 
 export const authOptions: NextAuthOptions = {
   pages: {
@@ -27,98 +78,27 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   providers: [
-    CredentialsProvider({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Senha", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = credentials?.email?.trim();
-        const password = credentials?.password;
-
-        if (!email || !password) {
-          return null;
-        }
-
-        const response = await fetch(`${backendBaseUrl}/users/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        });
-
-        if (!response.ok) {
-          return null;
-        }
-
-        const data = (await response.json()) as BackendAuthResponse;
-
-        return {
-          id: data.user.id,
-          name: data.user.name,
-          email: data.user.email,
-          provider: data.user.provider,
-          lastLogin: data.user.lastLogin,
-          isFirstLogin: data.user.isFirstLogin,
-          avatarUrl: data.user.avatarUrl,
-          avatarPublicId: data.user.avatarPublicId,
-          backendAccessToken: data.accessToken,
-        };
-      },
-    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     }),
+    DiscordProvider({
+      clientId: process.env.DISCORD_CLIENT_ID ?? "",
+      clientSecret: process.env.DISCORD_CLIENT_SECRET ?? "",
+    }),
   ],
   callbacks: {
     async signIn({ account, profile, user }) {
-      if (account?.provider !== "google") {
-        return true;
-      }
-
-      const email = user.email ?? profile?.email;
-      const name = user.name ?? profile?.name;
-      // Backend atual valida apenas prefixo "google_".
-      const googleToken = `google_${account.providerAccountId ?? "oauth"}`;
-
-      if (!email || !name || !googleToken) {
+      if (!account?.provider) {
         return false;
       }
-
-      const response = await fetch(`${backendBaseUrl}/users/login/google`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          googleToken,
-          email,
-          name,
-        }),
-      });
-
-      if (!response.ok) {
-        return false;
+      if (account.provider === "google") {
+        return syncOAuthWithBackend({ adapterUser: user, account, profile, provider: "google" });
       }
-
-      const data = (await response.json()) as BackendAuthResponse;
-      user.id = data.user.id;
-      user.email = data.user.email;
-      user.name = data.user.name;
-      user.provider = data.user.provider;
-      user.lastLogin = data.user.lastLogin;
-      user.isFirstLogin = data.user.isFirstLogin;
-      user.avatarUrl = data.user.avatarUrl;
-      user.avatarPublicId = data.user.avatarPublicId;
-      user.backendAccessToken = data.accessToken;
-
-      return true;
+      if (account.provider === "discord") {
+        return syncOAuthWithBackend({ adapterUser: user, account, profile, provider: "discord" });
+      }
+      return false;
     },
     async jwt({ token, user }) {
       if (user) {
@@ -135,7 +115,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.provider = token.provider as "local" | "google";
+        session.user.provider = token.provider as "local" | "google" | "discord";
         session.user.lastLogin = (token.lastLogin as string | null | undefined) ?? null;
         session.user.isFirstLogin = Boolean(token.isFirstLogin);
         session.user.avatarUrl = (token.avatarUrl as string | null | undefined) ?? null;

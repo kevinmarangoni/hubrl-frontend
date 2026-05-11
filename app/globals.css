@@ -101,6 +101,44 @@
     background: var(--color-surface);
   }
 
+  /**
+   * Hero full-bleed na home: gradiente atmosférico + vinheta para texto claro,
+   * fundindo na cor canvas no rodapé (referência layout “Bloom”).
+   */
+  .home-hero {
+    position: relative;
+    isolation: isolate;
+    min-height: min(100dvh, 56rem);
+    width: 100%;
+    background-color: #c4b5fd;
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(12, 10, 28, 0.58) 0%,
+        rgba(12, 10, 28, 0.32) 42%,
+        rgba(245, 241, 255, 0.97) 100%
+      ),
+      radial-gradient(ellipse 120% 90% at 50% 108%, rgba(251, 207, 232, 0.92) 0%, transparent 58%),
+      radial-gradient(ellipse 90% 72% at 0% 32%, rgba(196, 181, 253, 0.95) 0%, transparent 52%),
+      radial-gradient(ellipse 78% 58% at 100% 16%, rgba(253, 186, 116, 0.78) 0%, transparent 48%),
+      linear-gradient(198deg, #ede9fe 0%, #ddd6fe 26%, #fbcfe8 52%, #fed7aa 82%, #fef9c3 100%);
+  }
+
+  .dark .home-hero {
+    background-color: #0a0612;
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.5) 0%,
+        rgba(0, 0, 0, 0.22) 44%,
+        color-mix(in srgb, var(--color-canvas) 99%, transparent) 100%
+      ),
+      radial-gradient(ellipse 115% 88% at 50% 112%, rgba(88, 28, 135, 0.75) 0%, transparent 56%),
+      radial-gradient(ellipse 72% 52% at -2% 28%, rgba(124, 58, 237, 0.42) 0%, transparent 50%),
+      radial-gradient(ellipse 65% 48% at 102% 12%, rgba(157, 0, 255, 0.38) 0%, transparent 46%),
+      linear-gradient(198deg, #1e0b3a 0%, #12081f 38%, #06040d 100%);
+  }
+
   .input-field {
     @apply w-full rounded-xl px-3 py-2.5 text-fg outline-none transition;
     border: 1px solid var(--color-border);

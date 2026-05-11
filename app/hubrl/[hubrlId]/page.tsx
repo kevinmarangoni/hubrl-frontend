@@ -1,141 +1,8 @@
 import { notFound } from "next/navigation";
-import { clampLayerOpacity } from "@/lib/hubrl-background-layers";
 import { linkPillBorderRadiusStyle } from "@/lib/hubrl-link-pill-preview";
-
-type HubrlLinkItem = {
-  avatarImageUrl: string | null;
-  backgroundColor: string | null;
-  backgroundImageUrl: string | null;
-  backgroundGradientCss: string | null;
-  backgroundImageLayerOn: boolean;
-  backgroundImageLayerOpacity: number;
-  backgroundSolidLayerOn: boolean;
-  backgroundSolidLayerOpacity: number;
-  backgroundGradientLayerOn: boolean;
-  backgroundGradientLayerOpacity: number;
-  borderRadiusTopLeftPx: number;
-  borderRadiusTopRightPx: number;
-  borderRadiusBottomRightPx: number;
-  borderRadiusBottomLeftPx: number;
-  text: string;
-  url: string;
-  isAdultOnly: boolean;
-};
-
-type HubrlView = {
-  id: string;
-  hubrlId: string;
-  title: string;
-  handle: string | null;
-  description: string | null;
-  profileImageUrl: string | null;
-  backgroundColor: string | null;
-  backgroundImageUrl: string | null;
-  backgroundGradientCss: string | null;
-  backgroundImageLayerOn: boolean;
-  backgroundImageLayerOpacity: number;
-  backgroundSolidLayerOn: boolean;
-  backgroundSolidLayerOpacity: number;
-  backgroundGradientLayerOn: boolean;
-  backgroundGradientLayerOpacity: number;
-  cardBackgroundColor?: string | null;
-  cardBackgroundImageUrl?: string | null;
-  cardBackgroundGradientCss?: string | null;
-  cardBackgroundImageLayerOn?: boolean;
-  cardBackgroundImageLayerOpacity?: number;
-  cardBackgroundSolidLayerOn?: boolean;
-  cardBackgroundSolidLayerOpacity?: number;
-  cardBackgroundGradientLayerOn?: boolean;
-  cardBackgroundGradientLayerOpacity?: number;
-  links: HubrlLinkItem[];
-};
-
-const backendBaseUrl = process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
-
-function isValidHexColor(raw: string | null | undefined): raw is string {
-  return typeof raw === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw.trim());
-}
-
-function buildLayeredBackground(input: {
-  backgroundColor: string | null;
-  backgroundImageUrl: string | null;
-  backgroundGradientCss: string | null;
-  backgroundImageLayerOn: boolean;
-  backgroundImageLayerOpacity: number;
-  backgroundSolidLayerOn: boolean;
-  backgroundSolidLayerOpacity: number;
-  backgroundGradientLayerOn: boolean;
-  backgroundGradientLayerOpacity: number;
-}) {
-  const imageUrl = input.backgroundImageUrl?.trim() ?? "";
-  const solidColor = input.backgroundColor?.trim() ?? "";
-  const gradientCss = input.backgroundGradientCss?.trim() ?? "";
-  const hasImage = input.backgroundImageLayerOn && imageUrl.length > 0 && input.backgroundImageLayerOpacity > 0;
-  const hasGradient =
-    input.backgroundGradientLayerOn && gradientCss.length > 0 && input.backgroundGradientLayerOpacity > 0;
-  const hasSolid = input.backgroundSolidLayerOn && isValidHexColor(solidColor) && input.backgroundSolidLayerOpacity > 0;
-
-  if (!hasImage && !hasGradient && !hasSolid) {
-    return {
-      backgroundImage: "linear-gradient(165deg, #4c1d95 0%, #6d28d9 45%, #c084fc 100%)",
-    } as const;
-  }
-
-  const layers: string[] = [];
-  if (hasImage) {
-    layers.push(
-      `linear-gradient(rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundImageLayerOpacity) / 100}), rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundImageLayerOpacity) / 100})), url("${imageUrl}")`,
-    );
-  }
-  if (hasGradient) {
-    layers.push(
-      `linear-gradient(rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundGradientLayerOpacity) / 100}), rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundGradientLayerOpacity) / 100})), ${gradientCss}`,
-    );
-  }
-  if (hasSolid) {
-    layers.push(
-      `linear-gradient(rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundSolidLayerOpacity) / 100}), rgba(255,255,255,${1 - clampLayerOpacity(input.backgroundSolidLayerOpacity) / 100})), linear-gradient(${solidColor}, ${solidColor})`,
-    );
-  }
-
-  return {
-    backgroundImage: layers.join(", "),
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "center",
-    backgroundSize: hasImage ? "cover" : undefined,
-  } as const;
-}
-
-async function getHubrlById(hubrlId: string): Promise<HubrlView | null> {
-  const response = await fetch(`${backendBaseUrl}/hubrls/${encodeURIComponent(hubrlId)}`, {
-    cache: "no-store",
-  });
-  if (response.status === 404) {
-    return null;
-  }
-  if (!response.ok) {
-    return null;
-  }
-  return (await response.json()) as HubrlView;
-}
-
-function mapToVisualLayers(input: {
-  backgroundColor: string | null;
-  backgroundImageUrl: string | null;
-  backgroundGradientCss: string | null;
-  backgroundImageLayerOn: boolean;
-  backgroundImageLayerOpacity: number;
-  backgroundSolidLayerOn: boolean;
-  backgroundSolidLayerOpacity: number;
-  backgroundGradientLayerOn: boolean;
-  backgroundGradientLayerOpacity: number;
-}) {
-  const bg = buildLayeredBackground(input);
-  return {
-    bg,
-    hasImage: input.backgroundImageLayerOn && Boolean(input.backgroundImageUrl?.trim()),
-  };
-}
+import { HubrlPublicViewBeacon } from "./hubrl-public-view-beacon";
+import { HubrlTrackedLink } from "./hubrl-tracked-link";
+import { buildLayeredBackground, getHubrlById, mapToVisualLayers } from "./utils";
 
 export default async function HubrlByIdPage({ params }: { params: Promise<{ hubrlId: string }> }) {
   const { hubrlId } = await params;
@@ -187,6 +54,7 @@ export default async function HubrlByIdPage({ params }: { params: Promise<{ hubr
 
   return (
     <main className="relative min-h-screen overflow-hidden">
+      <HubrlPublicViewBeacon hubrlId={hubrl.hubrlId} />
       <div className="absolute inset-0 z-0" style={pageVisual.bg} aria-hidden />
       {pageVisual.hasImage ? <div className="pointer-events-none absolute inset-0 z-[1] bg-black/35" aria-hidden /> : null}
 
@@ -238,15 +106,10 @@ export default async function HubrlByIdPage({ params }: { params: Promise<{ hubr
                     bottomRight: link.borderRadiusBottomRightPx,
                     bottomLeft: link.borderRadiusBottomLeftPx,
                   });
-                  return (
-                    <a
-                      key={`${link.url}-${index}`}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative flex min-h-[52px] w-full items-center gap-2 overflow-hidden border-2 border-white/85 px-3 py-2.5 text-white no-underline shadow-sm transition hover:brightness-110"
-                      style={{ ...linkBackground, borderRadius }}
-                    >
+                  const commonClassName =
+                    "relative flex min-h-[52px] w-full items-center gap-2 overflow-hidden border-2 border-white/85 px-3 py-2.5 text-white no-underline shadow-sm transition hover:brightness-110";
+                  const inner = (
+                    <>
                       {link.backgroundImageLayerOn && link.backgroundImageUrl ? (
                         <div className="pointer-events-none absolute inset-0 bg-black/30" aria-hidden />
                       ) : null}
@@ -263,6 +126,36 @@ export default async function HubrlByIdPage({ params }: { params: Promise<{ hubr
                           18+
                         </span>
                       ) : null}
+                    </>
+                  );
+
+                  if (link.linkId) {
+                    return (
+                      <HubrlTrackedLink
+                        key={link.linkId}
+                        hubrlId={hubrl.hubrlId}
+                        linkId={link.linkId}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={commonClassName}
+                        style={{ ...linkBackground, borderRadius }}
+                      >
+                        {inner}
+                      </HubrlTrackedLink>
+                    );
+                  }
+
+                  return (
+                    <a
+                      key={`${link.url}-${index}`}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={commonClassName}
+                      style={{ ...linkBackground, borderRadius }}
+                    >
+                      {inner}
                     </a>
                   );
                 })

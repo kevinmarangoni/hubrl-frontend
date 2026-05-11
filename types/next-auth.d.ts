@@ -5,7 +5,7 @@ declare module "next-auth" {
     backendAccessToken?: string;
     user: DefaultSession["user"] & {
       id: string;
-      provider: "local" | "google";
+      provider: "local" | "google" | "discord";
       lastLogin: string | null;
       isFirstLogin: boolean;
       avatarUrl?: string | null;
@@ -15,7 +15,7 @@ declare module "next-auth" {
 
   interface User {
     id: string;
-    provider: "local" | "google";
+    provider: "local" | "google" | "discord";
     lastLogin?: string | null;
     isFirstLogin?: boolean;
     avatarUrl?: string | null;
@@ -27,7 +27,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
-    provider?: "local" | "google";
+    provider?: "local" | "google" | "discord";
     lastLogin?: string | null;
     isFirstLogin?: boolean;
     avatarUrl?: string | null;

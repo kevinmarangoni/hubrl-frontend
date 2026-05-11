@@ -1,8 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-
-const backendBaseUrl = process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
+import { backend } from "@/lib/http";
 
 export async function PATCH(
   request: NextRequest,
@@ -15,13 +14,8 @@ export async function PATCH(
 
   const body = await request.json();
   const { hubrlId } = await params;
-  const response = await fetch(`${backendBaseUrl}/hubrls/${encodeURIComponent(hubrlId)}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.backendAccessToken}`,
-    },
-    body: JSON.stringify(body),
+  const response = await backend.patch(`hubrls/${encodeURIComponent(hubrlId)}`, session.backendAccessToken, {
+    json: body,
   });
 
   const data = await response.json();

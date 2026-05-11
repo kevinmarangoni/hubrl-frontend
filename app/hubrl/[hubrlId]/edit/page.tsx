@@ -4,54 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { SiteChrome } from "@/components/site-chrome";
 import { CreateHubrlForm } from "@/app/hubrl/create/create-hubrl-form";
 import { authOptions } from "@/lib/auth";
-
-type HubrlItem = {
-  id: string;
-  hubrlId?: string | null;
-  title: string;
-  handle: string | null;
-  description: string | null;
-  profileImageUrl: string | null;
-  backgroundColor: string | null;
-  backgroundImageUrl: string | null;
-  backgroundGradientCss: string | null;
-  backgroundImageLayerOn: boolean;
-  backgroundImageLayerOpacity: number;
-  backgroundSolidLayerOn: boolean;
-  backgroundSolidLayerOpacity: number;
-  backgroundGradientLayerOn: boolean;
-  backgroundGradientLayerOpacity: number;
-  cardBackgroundColor?: string | null;
-  cardBackgroundImageUrl?: string | null;
-  cardBackgroundGradientCss?: string | null;
-  cardBackgroundImageLayerOn?: boolean;
-  cardBackgroundImageLayerOpacity?: number;
-  cardBackgroundSolidLayerOn?: boolean;
-  cardBackgroundSolidLayerOpacity?: number;
-  cardBackgroundGradientLayerOn?: boolean;
-  cardBackgroundGradientLayerOpacity?: number;
-  links: Array<{
-    avatarImageUrl: string | null;
-    backgroundColor: string | null;
-    backgroundImageUrl: string | null;
-    backgroundGradientCss: string | null;
-    backgroundImageLayerOn: boolean;
-    backgroundImageLayerOpacity: number;
-    backgroundSolidLayerOn: boolean;
-    backgroundSolidLayerOpacity: number;
-    backgroundGradientLayerOn: boolean;
-    backgroundGradientLayerOpacity: number;
-    borderRadiusTopLeftPx: number;
-    borderRadiusTopRightPx: number;
-    borderRadiusBottomRightPx: number;
-    borderRadiusBottomLeftPx: number;
-    text: string;
-    url: string;
-    isAdultOnly: boolean;
-  }>;
-};
-
-const backendBaseUrl = process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
+import { backend } from "@/lib/http";
+import type { HubrlEditListItem } from "./types";
 
 export default async function EditHubrlPage({ params }: { params: Promise<{ hubrlId: string }> }) {
   const { hubrlId } = await params;
@@ -60,13 +14,7 @@ export default async function EditHubrlPage({ params }: { params: Promise<{ hubr
     redirect("/login");
   }
 
-  const response = await fetch(`${backendBaseUrl}/hubrls/mine`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.backendAccessToken}`,
-    },
-    cache: "no-store",
-  });
+  const response = await backend.get("hubrls/mine", session.backendAccessToken, { cache: "no-store" });
 
   if (response.status === 401) {
     redirect("/login");
@@ -75,7 +23,7 @@ export default async function EditHubrlPage({ params }: { params: Promise<{ hubr
     notFound();
   }
 
-  const hubrls = (await response.json()) as HubrlItem[];
+  const hubrls = (await response.json()) as HubrlEditListItem[];
   const hubrl = hubrls.find((item) => item.hubrlId === hubrlId || item.id === hubrlId);
   if (!hubrl) {
     notFound();
@@ -89,7 +37,7 @@ export default async function EditHubrlPage({ params }: { params: Promise<{ hubr
           <h1 className="m-0 text-2xl font-bold text-fg">Editar Hubrl</h1>
           <p className="m-0 text-sm text-fg-muted">ID público: {hubrl.hubrlId ?? hubrl.id}</p>
         </div>
-        <Link href="/hubrls" className="btn-secondary text-sm no-underline">
+        <Link href="/user" className="btn-secondary text-sm no-underline">
           Voltar
         </Link>
       </div>

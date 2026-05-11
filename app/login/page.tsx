@@ -1,22 +1,17 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { SiteChrome } from "@/components/site-chrome";
 import { authOptions } from "@/lib/auth";
+import { backend } from "@/lib/http";
 import { AutoSignOut } from "./auto-signout";
 import { LoginForm } from "./login-form";
-
-const backendBaseUrl =
-  process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
 
 export default async function LoginPage() {
   const session = await getServerSession(authOptions);
 
-  if (session) {
-    const response = await fetch(`${backendBaseUrl}/users/me`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${session.backendAccessToken}`,
-      },
+  if (session?.backendAccessToken) {
+    const response = await backend.get("users/me", session.backendAccessToken, {
       cache: "no-store",
     });
 
@@ -42,9 +37,11 @@ export default async function LoginPage() {
       <SiteChrome />
       <div className="glass-panel p-8">
         <h1 className="mt-0 text-2xl font-bold text-fg">Login</h1>
-        <p className="text-fg-muted">Autentique com email/senha ou Google.</p>
+        <p className="text-fg-muted">Entre com Google ou Discord. Não usamos email e senha nesta tela.</p>
         <div className="mt-6">
-          <LoginForm />
+          <Suspense fallback={<p className="m-0 text-sm text-fg-muted">Carregando…</p>}>
+            <LoginForm />
+          </Suspense>
         </div>
       </div>
     </main>

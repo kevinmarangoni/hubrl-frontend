@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { SiteChrome } from "@/components/site-chrome";
 import { authOptions } from "@/lib/auth";
+import { backend } from "@/lib/http";
 import { suggestedHandleFromName } from "@/lib/slug-handle";
 import { CreateHubrlForm } from "./create-hubrl-form";
 
@@ -12,9 +13,6 @@ type UserProfile = {
   avatarUrl: string | null;
 };
 
-const backendBaseUrl =
-  process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
-
 export default async function CreateHubrlPage() {
   const session = await getServerSession(authOptions);
 
@@ -22,13 +20,7 @@ export default async function CreateHubrlPage() {
     redirect("/login");
   }
 
-  const response = await fetch(`${backendBaseUrl}/users/me`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${session.backendAccessToken}`,
-    },
-    cache: "no-store",
-  });
+  const response = await backend.get("users/me", session.backendAccessToken, { cache: "no-store" });
 
   if (!response.ok) {
     redirect("/login");

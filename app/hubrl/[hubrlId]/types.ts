@@ -1,0 +1,48 @@
+export type HubrlLinkItem = {
+  linkId?: string;
+  avatarImageUrl: string | null;
+  backgroundColor: string | null;
+  backgroundImageUrl: string | null;
+  backgroundGradientCss: string | null;
+  backgroundImageLayerOn: boolean;
+  backgroundImageLayerOpacity: number;
+  backgroundSolidLayerOn: boolean;
+  backgroundSolidLayerOpacity: number;
+  backgroundGradientLayerOn: boolean;
+  backgroundGradientLayerOpacity: number;
+  borderRadiusTopLeftPx: number;
+  borderRadiusTopRightPx: number;
+  borderRadiusBottomRightPx: number;
+  borderRadiusBottomLeftPx: number;
+  text: string;
+  url: string;
+  isAdultOnly: boolean;
+};
+
+export type HubrlView = {
+  id: string;
+  hubrlId: string;
+  title: string;
+  handle: string | null;
+  description: string | null;
+  profileImageUrl: string | null;
+  backgroundColor: string | null;
+  backgroundImageUrl: string | null;
+  backgroundGradientCss: string | null;
+  backgroundImageLayerOn: boolean;
+  backgroundImageLayerOpacity: number;
+  backgroundSolidLayerOn: boolean;
+  backgroundSolidLayerOpacity: number;
+  backgroundGradientLayerOn: boolean;
+  backgroundGradientLayerOpacity: number;
+  cardBackgroundColor?: string | null;
+  cardBackgroundImageUrl?: string | null;
+  cardBackgroundGradientCss?: string | null;
+  cardBackgroundImageLayerOn?: boolean;
+  cardBackgroundImageLayerOpacity?: number;
+  cardBackgroundSolidLayerOn?: boolean;
+  cardBackgroundSolidLayerOpacity?: number;
+  cardBackgroundGradientLayerOn?: boolean;
+  cardBackgroundGradientLayerOpacity?: number;
+  links: HubrlLinkItem[];
+};

@@ -17,6 +17,7 @@ import {
   type HubrlBackgroundLayersState,
 } from "@/lib/hubrl-background-layers";
 import { handleUnauthorizedResponse } from "@/lib/handle-unauthorized";
+import { http } from "@/lib/http";
 import {
   computeLinkPillBackgroundStack,
   linkPillBorderRadiusStyle,
@@ -26,94 +27,21 @@ import {
   hubrlPageGradientToCss,
   type HubrlPageGradient,
 } from "@/lib/hubrl-page-gradient";
-
-export type HubrlLinkInput = {
-  avatarImageUrl: string;
-  backgroundColor: string;
-  backgroundImageUrl: string;
-  linkBackgroundLayers: HubrlBackgroundLayersState;
-  linkGradient: HubrlPageGradient;
-  borderRadiusTopLeftPx: number;
-  borderRadiusTopRightPx: number;
-  borderRadiusBottomRightPx: number;
-  borderRadiusBottomLeftPx: number;
-  text: string;
-  url: string;
-  isAdultOnly: boolean;
-};
-
-export type CreateHubrlFormInitialData = {
-  hubrlId?: string;
-  title: string;
-  handle: string;
-  description?: string;
-  profileImageUrl: string;
-  backgroundColor?: string;
-  backgroundImageUrl?: string;
-  backgroundGradientCss?: string | null;
-  backgroundLayers?: HubrlBackgroundLayersState;
-  backgroundImageLayerOn?: boolean;
-  backgroundImageLayerOpacity?: number;
-  backgroundSolidLayerOn?: boolean;
-  backgroundSolidLayerOpacity?: number;
-  backgroundGradientLayerOn?: boolean;
-  backgroundGradientLayerOpacity?: number;
-  cardBackgroundColor?: string;
-  cardBackgroundImageUrl?: string;
-  cardBackgroundGradientCss?: string | null;
-  cardBackgroundImageLayerOn?: boolean;
-  cardBackgroundImageLayerOpacity?: number;
-  cardBackgroundSolidLayerOn?: boolean;
-  cardBackgroundSolidLayerOpacity?: number;
-  cardBackgroundGradientLayerOn?: boolean;
-  cardBackgroundGradientLayerOpacity?: number;
-  links?: Array<{
-    avatarImageUrl?: string | null;
-    backgroundColor?: string | null;
-    backgroundImageUrl?: string | null;
-    backgroundGradientCss?: string | null;
-    backgroundImageLayerOn?: boolean;
-    backgroundImageLayerOpacity?: number;
-    backgroundSolidLayerOn?: boolean;
-    backgroundSolidLayerOpacity?: number;
-    backgroundGradientLayerOn?: boolean;
-    backgroundGradientLayerOpacity?: number;
-    borderRadiusTopLeftPx?: number | null;
-    borderRadiusTopRightPx?: number | null;
-    borderRadiusBottomRightPx?: number | null;
-    borderRadiusBottomLeftPx?: number | null;
-    text: string;
-    url: string;
-    isAdultOnly?: boolean;
-  }>;
-};
-
-/** Presets por canto: quadrado (4px), semi (16px), circular (9999 → CSS pílula). */
-const LINK_RADIUS_SQUARE_PX = 4;
-const LINK_RADIUS_SEMI_PX = 16;
-const LINK_RADIUS_CIRCULAR_PX = 9999;
-
-type LinkCornerShape = "square" | "semi" | "circular";
-
-function linkCornerShapeFromPx(px: number): LinkCornerShape {
-  if (px >= 500) {
-    return "circular";
-  }
-  if (px <= 8) {
-    return "square";
-  }
-  return "semi";
-}
-
-function linkCornerPxFromShape(shape: LinkCornerShape): number {
-  if (shape === "square") {
-    return LINK_RADIUS_SQUARE_PX;
-  }
-  if (shape === "semi") {
-    return LINK_RADIUS_SEMI_PX;
-  }
-  return LINK_RADIUS_CIRCULAR_PX;
-}
+import type {
+  CreateHubrlFormInitialData,
+  HubrlLinkInput,
+  ImageUploadSlot,
+  LinkCornerShape,
+} from "./types";
+import {
+  cloneLinkForEdit,
+  createEmptyLink,
+  linkCornerPxFromShape,
+  linkUniformCornerPreset,
+  mapInitialLinkToInput,
+  parseGradientCss,
+  safeExternalHref,
+} from "./utils";
 
 /** Miniatura do contorno do botão para cada preset de cantos. */
 function LinkCornerPresetGlyph({ shape }: { shape: LinkCornerShape }) {
@@ -125,143 +53,6 @@ function LinkCornerPresetGlyph({ shape }: { shape: LinkCornerShape }) {
       style={{ borderRadius }}
     />
   );
-}
-
-/** Se os quatro cantos forem iguais, devolve o preset; senão `null` (nenhum botão ativo). */
-function linkUniformCornerPreset(link: HubrlLinkInput): LinkCornerShape | null {
-  const { borderRadiusTopLeftPx: tl, borderRadiusTopRightPx: tr, borderRadiusBottomRightPx: br, borderRadiusBottomLeftPx: bl } =
-    link;
-  if (tl !== tr || tr !== br || br !== bl) {
-    return null;
-  }
-  return linkCornerShapeFromPx(tl);
-}
-
-function createEmptyLink(): HubrlLinkInput {
-  return {
-    avatarImageUrl: "",
-    backgroundColor: "",
-    backgroundImageUrl: "",
-    linkBackgroundLayers: { ...DEFAULT_HUBRL_BACKGROUND_LAYERS },
-    linkGradient: createDefaultHubrlPageGradient(),
-    borderRadiusTopLeftPx: LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusTopRightPx: LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusBottomRightPx: LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusBottomLeftPx: LINK_RADIUS_CIRCULAR_PX,
-    text: "",
-    url: "",
-    isAdultOnly: false,
-  };
-}
-
-function cloneLinkForEdit(link: HubrlLinkInput): HubrlLinkInput {
-  return {
-    ...link,
-    linkBackgroundLayers: { ...link.linkBackgroundLayers },
-    linkGradient: {
-      ...link.linkGradient,
-      stops: link.linkGradient.stops.map((s) => ({ ...s })),
-    },
-  };
-}
-
-function parseGradientCss(raw: string | null | undefined): HubrlPageGradient {
-  const fallback = createDefaultHubrlPageGradient();
-  const css = raw?.trim();
-  if (!css) {
-    return fallback;
-  }
-
-  const linear = /^linear-gradient\(\s*([+-]?\d+(?:\.\d+)?)deg\s*,\s*(.+)\)$/i.exec(css);
-  if (linear) {
-    const angle = Number(linear[1]);
-    const stopsRaw = linear[2]
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const stops = stopsRaw
-      .map((part) => {
-        const m = /^(#[0-9a-f]{3,6})\s+([+-]?\d+(?:\.\d+)?)%$/i.exec(part);
-        if (!m) {
-          return null;
-        }
-        return { id: crypto.randomUUID(), color: m[1], position: Number(m[2]) };
-      })
-      .filter((s): s is { id: string; color: string; position: number } => Boolean(s));
-    if (stops.length >= 2) {
-      return { kind: "linear", angleDeg: Number.isFinite(angle) ? angle : 165, stops };
-    }
-  }
-
-  const radial = /^radial-gradient\(\s*circle\s*,\s*(.+)\)$/i.exec(css);
-  if (radial) {
-    const stopsRaw = radial[1]
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const stops = stopsRaw
-      .map((part) => {
-        const m = /^(#[0-9a-f]{3,6})\s+([+-]?\d+(?:\.\d+)?)%$/i.exec(part);
-        if (!m) {
-          return null;
-        }
-        return { id: crypto.randomUUID(), color: m[1], position: Number(m[2]) };
-      })
-      .filter((s): s is { id: string; color: string; position: number } => Boolean(s));
-    if (stops.length >= 2) {
-      return { kind: "radial", angleDeg: 0, stops };
-    }
-  }
-
-  return fallback;
-}
-
-function mapInitialLinkToInput(link: NonNullable<CreateHubrlFormInitialData["links"]>[number]): HubrlLinkInput {
-  return {
-    avatarImageUrl: link.avatarImageUrl?.trim() ?? "",
-    backgroundColor: link.backgroundColor?.trim() ?? "",
-    backgroundImageUrl: link.backgroundImageUrl?.trim() ?? "",
-    linkBackgroundLayers: {
-      imageOn: Boolean(link.backgroundImageLayerOn),
-      imageOpacity: clampLayerOpacity(link.backgroundImageLayerOpacity ?? 100),
-      solidOn: Boolean(link.backgroundSolidLayerOn),
-      solidOpacity: clampLayerOpacity(link.backgroundSolidLayerOpacity ?? 100),
-      gradientOn: link.backgroundGradientLayerOn === undefined ? true : Boolean(link.backgroundGradientLayerOn),
-      gradientOpacity: clampLayerOpacity(link.backgroundGradientLayerOpacity ?? 100),
-    },
-    linkGradient: parseGradientCss(link.backgroundGradientCss),
-    borderRadiusTopLeftPx: link.borderRadiusTopLeftPx ?? LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusTopRightPx: link.borderRadiusTopRightPx ?? LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusBottomRightPx: link.borderRadiusBottomRightPx ?? LINK_RADIUS_CIRCULAR_PX,
-    borderRadiusBottomLeftPx: link.borderRadiusBottomLeftPx ?? LINK_RADIUS_CIRCULAR_PX,
-    text: link.text ?? "",
-    url: link.url ?? "",
-    isAdultOnly: Boolean(link.isAdultOnly),
-  };
-}
-
-type ImageUploadSlot = "profile" | "pageBackground" | "cardBackground" | "draftAvatar" | "draftBg";
-
-/** URL segura para abrir numa nova aba a partir do texto do utilizador. */
-function safeExternalHref(raw: string): string | undefined {
-  const t = raw.trim();
-  if (!t) {
-    return undefined;
-  }
-  const lower = t.toLowerCase();
-  if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
-    return undefined;
-  }
-  if (/^https?:\/\//i.test(t)) {
-    return t;
-  }
-  if (/^mailto:/i.test(t) || /^\//.test(t)) {
-    return t;
-  }
-  if (/^\/\//.test(t)) {
-    return `https:${t}`;
-  }
-  return `https://${t}`;
 }
 
 function LinkPillPreview({
@@ -524,8 +315,7 @@ export function CreateHubrlForm({ initialData }: { initialData: CreateHubrlFormI
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/hubrls/upload-image", {
-          method: "POST",
+        const response = await http.post("/api/hubrls/upload-image", {
           body: formData,
         });
 
@@ -573,12 +363,7 @@ export function CreateHubrlForm({ initialData }: { initialData: CreateHubrlFormI
     mutationFn: async () => {
       const handleBody = handle.replace(/^@+/g, "").trim();
       const url = isEditMode ? `/api/hubrls/${encodeURIComponent(initialData.hubrlId!.trim())}` : "/api/hubrls";
-      const response = await fetch(url, {
-        method: isEditMode ? "PATCH" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const json = {
           title: title.trim(),
           handle: handleBody.length ? handleBody : undefined,
           description: description.trim() || undefined,
@@ -619,9 +404,12 @@ export function CreateHubrlForm({ initialData }: { initialData: CreateHubrlFormI
             text: link.text.trim(),
             url: link.url.trim(),
             isAdultOnly: link.isAdultOnly,
+            ...(link.linkId?.trim() ? { linkId: link.linkId.trim() } : {}),
           })),
-        }),
-      });
+      };
+      const response = isEditMode
+        ? await http.patch(url, { json })
+        : await http.post(url, { json });
 
       if (await handleUnauthorizedResponse(response)) {
         throw new Error("Sessao expirada");
@@ -634,7 +422,7 @@ export function CreateHubrlForm({ initialData }: { initialData: CreateHubrlFormI
       return data;
     },
     onSuccess: () => {
-      router.push("/hubrls");
+      router.push("/user");
       router.refresh();
     },
   });
@@ -1190,3 +978,5 @@ export function CreateHubrlForm({ initialData }: { initialData: CreateHubrlFormI
     </form>
   );
 }
+
+export type { CreateHubrlFormInitialData, HubrlLinkInput } from "./types";

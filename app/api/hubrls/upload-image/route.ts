@@ -1,9 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-
-const backendBaseUrl =
-  process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
+import { backend } from "@/lib/http";
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -22,11 +20,7 @@ export async function POST(request: NextRequest) {
   const outgoing = new FormData();
   outgoing.append("file", file);
 
-  const response = await fetch(`${backendBaseUrl}/hubrls/upload-image`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.backendAccessToken}`,
-    },
+  const response = await backend.post("hubrls/upload-image", session.backendAccessToken, {
     body: outgoing,
   });
 

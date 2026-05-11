@@ -1,9 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-
-const backendBaseUrl =
-  process.env.BACKEND_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000/v1";
+import { backend } from "@/lib/http";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -34,11 +32,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     outputFormData.append("avatar", avatar);
   }
 
-  const response = await fetch(`${backendBaseUrl}/users/me`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${session.backendAccessToken}`,
-    },
+  const response = await backend.patch("users/me", session.backendAccessToken, {
     body: outputFormData,
   });
 

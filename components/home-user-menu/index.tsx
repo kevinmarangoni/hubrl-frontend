@@ -3,19 +3,10 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
+import type { HomeUserMenuProps } from "./types";
+import { dropdownItemClass, triggerDefaultClass, triggerOverlayClass } from "./utils";
 
-type HomeUserMenuProps = {
-  user: {
-    name?: string | null;
-    email?: string | null;
-    avatarUrl?: string | null;
-  };
-};
-
-const itemClass =
-  "block w-full rounded-lg px-2.5 py-2 text-sm text-fg no-underline outline-none transition hover:bg-accent-muted/40 focus:bg-accent-muted/40";
-
-export function HomeUserMenu({ user }: HomeUserMenuProps) {
+export function HomeUserMenu({ user, overlayTrigger }: HomeUserMenuProps) {
   const fallbackLabel = (user.name ?? user.email ?? "U").trim().charAt(0).toUpperCase() || "U";
 
   return (
@@ -24,12 +15,16 @@ export function HomeUserMenu({ user }: HomeUserMenuProps) {
         <button
           type="button"
           aria-label="Abrir menu do usuario"
-          className="grid size-10 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border border-border-strong bg-surface/80 p-0 shadow-sm backdrop-blur-sm transition hover:border-accent/50 hover:ring-2 hover:ring-accent/20"
+          className={overlayTrigger ? triggerOverlayClass : triggerDefaultClass}
         >
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="Avatar do usuario" className="size-full object-cover" />
           ) : (
-            <span className="text-sm font-semibold text-accent">{fallbackLabel}</span>
+            <span
+              className={`text-sm font-semibold ${overlayTrigger ? "text-white" : "text-accent"}`}
+            >
+              {fallbackLabel}
+            </span>
           )}
         </button>
       </DropdownMenu.Trigger>
@@ -46,23 +41,23 @@ export function HomeUserMenu({ user }: HomeUserMenuProps) {
           </div>
 
           <DropdownMenu.Item asChild>
-            <Link href="/user" className={itemClass}>
+            <Link href="/user" className={dropdownItemClass}>
               Ver perfil
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
-            <Link href="/hubrl/create" className={itemClass}>
+            <Link href="/hubrl/create" className={dropdownItemClass}>
               Criar um hubrl
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
-            <Link href="/hubrls" className={itemClass}>
-              Meus hubrl&apos;s
+            <Link href="/user" className={dropdownItemClass}>
+              Painel
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
-            <Link href="/user/update" className={itemClass}>
-              Editar usuario
+            <Link href="/user/update" className={dropdownItemClass}>
+              Editar perfil
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border/80" />
